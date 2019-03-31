@@ -106,16 +106,25 @@ function proc(feat, feats, mutate=true)
 end 
 
 
-# After filling word, forward and backward vectors cache the concated version
-function cachelmvec!(corpus)
+# Create feat vector: concat word embedding, context embeddings(forward and backward), postag, xpostag, and feats
+function createfeatvec!(corpus)
     for sent in corpus
         for i in 1:length(sent)
-            push!(sent.cavec, vcat(sent.wvec[i], sent.fvec[i], sent.bvec[i]))
+            push!(sent.cavec, vcat(sent.wvec[i], sent.fvec[i], sent.bvec[i], sent.postag[i], sent.xpostag[i], sent.feats[i]))
         end
     end
 end
 
-
+# Pad the feature vector (s.cavec) so that size of all feature vectors are 960
+function padfeatvec!(corpus)
+    for s in corpus
+        for c in 1:length(s.cavec)
+            while length(s.cavec[c]) < 960
+                push!(s.cavec[c],0)
+            end
+        end
+    end
+end
 
 function minibatch(corpus, batchsize; maxlen=typemax(Int), minlen=1, shuf=false)
     data = Any[]

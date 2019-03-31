@@ -34,6 +34,64 @@ const UPOSTAG = Dict{String,PosTag}(
 "X"     => 17, # other
 )
 
+const XPOSTAG = Dict{String, UInt8}(
+"Abr" => 25,
+"PCNom" => 17,
+"Dup" => 26,
+"PCIns" => 29,
+"Since" => 31,
+"Postp" => 30,
+"Interj" => 23,
+"Ques" => 13,
+"Demons" => 4,
+"NAdj" => 10,
+"With" => 21,
+"Rel" => 16,
+"Det" => 9,
+"Reflex" => 18,
+"ANum" => 14,
+"PCDat" => 11,
+"Punc" => 7,
+"Zero" => 3,
+"Ness" => 27,
+"Prop" => 12,
+"PCGen" => 32,
+"PCAcc" => 33,
+"Neg" => 28,
+"Noun" => 2,
+"Verb" => 6,
+"NNum" => 22,
+"Quant" => 5,
+"Pers" => 8,
+"Conj" => 19,
+"Adverb" => 15,
+"Adj" => 1,
+"PCAbl" => 20,
+"Without" => 24
+)
+
+const FEATS = Dict{String,UInt8}(
+  "Mood"         => 0x06,
+  "Aspect"       => 0x05,
+  "PronType"     => 0x08,
+  "NumType"      => 0x0e,
+  "VerbForm"     => 0x0d,
+  "Voice"        => 0x10,
+  "Echo"         => 0x13,
+  "Reflex"       => 0x0f,
+  "Tense"        => 0x07,
+  "Polarity"     => 0x0b,
+  "Evident"      => 0x11,
+  "Abbr"         => 0x12,
+  "Person[psor]" => 0x0a,
+  "_"            => 0x01,
+  "Case"         => 0x02,
+  "Person"       => 0x04,
+  "Number"       => 0x03,
+  "Polite"       => 0x0c,
+  "Number[psor]" => 0x09
+)
+
 # Universal Dependency Relations (37)
 const UDEPREL = Dict{String,DepRel}(
 "root"       => 1,  # root
@@ -74,6 +132,8 @@ const UDEPREL = Dict{String,DepRel}(
 "vocative"   => 36, # vocative
 "xcomp"      => 37, # open clausal complement
 )
+
+
 
 struct Vocab
     cdict::Dict{Char, Int}         # character vocabulary
