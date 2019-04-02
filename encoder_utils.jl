@@ -298,5 +298,5 @@ function fillvecs!(wmodel, sentences, vocab; batchsize=128)
         odata, omask = goldbatch(sentij, maxij, vocab.odict, unk)
         lmloss(wmodel,odata,omask,forw,back; result=result) 
     end
-    return exp(-result[1]/result[2])
+    #return exp(-result[1]/result[2])
 end

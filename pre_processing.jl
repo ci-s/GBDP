@@ -119,7 +119,7 @@ end
 function padfeatvec!(corpus)
     for s in corpus
         for c in 1:length(s.cavec)
-            while length(s.cavec[c]) < 960
+            while length(s.cavec[c]) < 965
                 push!(s.cavec[c],0)
             end
         end
@@ -128,7 +128,7 @@ end
 
 function minibatch(corpus, batchsize; maxlen=typemax(Int), minlen=1, shuf=false)
     data = Any[]
-    sorted = sort(corpus, by=length)
+    #sorted = sort(corpus, by=length)
     i1 = findfirst(x->(length(x) >= minlen), sorted)
     if i1==0; error("No sentences >= $minlen"); end
     i2 = findlast(x->(length(x) <= maxlen), sorted)
