@@ -219,3 +219,11 @@ function Base.:(==)(a::SuperSent, b::SuperSent)
 end
 
 const Corpus = AbstractVector{Sentence}
+
+# Things we added
+
+mutable struct FeatureSource
+    postags::Array{Float64}
+    xpostags::Array{Float64}
+    feats::Array{Float64}
+end

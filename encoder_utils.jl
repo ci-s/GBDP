@@ -1,3 +1,7 @@
+# using Distributions, Random ??
+
+global tagrepsize = 32 # Size of the randomly initialized column vectors that represents features such that xpostag, upostag, feats
+
 function fillwvecs!(sentences, isents, wembed; GPUFEATS=false)
     for (s, isents) in zip(sentences, isents)
         empty!(s.wvec)
@@ -264,7 +268,7 @@ wback(m) = m[6]; bback(m) = m[7];
 wsoft(m) = m[8]; bsoft(m) = m[9];
 
 
-function fillvecs!(wmodel, sentences, vocab; batchsize=128)
+function fillvecs!(wmodel, sentences, vocab, fs; batchsize=128)
 
     words, sents, maxwordlen, maxsentlen = maptoint(sentences, vocab)
     sow = vocab.cdict[vocab.sowchar]
@@ -281,9 +285,13 @@ function fillvecs!(wmodel, sentences, vocab; batchsize=128)
         cdata, cmask = tokenbatch(wij, maxij, sow, eow)
         push!(wembed, charlstm(wmodel, cdata, cmask))
     end
-    wembed =hcat(wembed...) # Here I applied the changes from hcatn-> hcat in newer version
+    wembed =hcat(wembed...)
     fillwvecs!(sentences, sents, wembed)
 
+    # extended word embeddings with xpos, upos and feats
+    extended_wembed = extend_wembeddings(v, fs, corpus, sents, wembed)
+    
+    
     sos,eos,unk = vocab.idict[vocab.sosword], vocab.idict[vocab.eosword], vocab.odict[vocab.unkword]
     result = zeros(2)
     #free_KnetArray()
@@ -291,12 +299,121 @@ function fillvecs!(wmodel, sentences, vocab; batchsize=128)
         j = min(i+batchsize-1, length(sents))
         isentij = view(sents, i:j)
         maxij = maximum(map(length, isentij))
-        wdata, wmask = tokenbatch(isentij, maxij, sos, eos)
-        forw, back = wordlstm(wmodel, wdata, wmask, wembed)
+        global wdata, wmask = tokenbatch(isentij, maxij, sos, eos)
+        forw, back = mywordlstm(wmodel, wdata, wmask, extended_wembed)
         sentij = view(sentences, i:j)
         fillcvecs!(sentij, forw, back)
         odata, omask = goldbatch(sentij, maxij, vocab.odict, unk)
         lmloss(wmodel,odata,omask,forw,back; result=result) 
     end
-    #return exp(-result[1]/result[2])
+    # return extended_wembed, wdata, wmask
+end
+
+
+# Things we added
+
+# Pad the feature vector (s.cavec) so that size of all feature vectors are 960
+function padfeatvec!(corpus) # used in demo, no longer used
+    for s in corpus
+        for c in 1:length(s.cavec)
+            while length(s.cavec[c]) < 965
+                push!(s.cavec[c],0)
+            end
+        end
+    end
+end
+
+
+# Creates column vectors for all unique xpostags, postags, and features; acts like a vocab, extendedvocab
+function createcolvecs(corpus,ev)
+    dist = Normal()
+    xpostags = rand(dist, (tagrepsize, length(keys(ev.xpostags))))
+    postags = rand(dist, (tagrepsize, length(keys(ev.vocab.postags))))
+    feats = rand(dist, (tagrepsize, length(keys(ev.feats))))
+    return FeatureSource(postags,xpostags,feats)
+end
+
+# fs: feature source, feats: features of a word, s.feats[i]
+function sumfeats(feats, fs)
+    sum = zeros(length(fs.feats[:,1]))
+    for i in 1:length(feats)
+        sum .+= fs.feats[:,feats[i]]
+    end
+    return sum
+end
+
+# Version where we concat xpostag, postag, feats after creating fvec, bvec
+function createfeatvec!(corpus, fs)
+    for sent in corpus
+        for i in 1:length(sent)
+            push!(sent.cavec, vcat(sent.wvec[i], sent.fvec[i], sent.bvec[i], fs.postags[:,sent.postag[i]], fs.xpostags[:,sent.xpostag[i]], sumfeats(sent.feats[i],fs)))
+        end
+    end
+end
+
+
+function extend_wembeddings(v, fs, corpus, sents, wembed) # v: Vocab, fs: feature source, sents: maptoint output-int represented sentences,  
+    wembed_extension = []
+    dist = Normal() # to initialize eosword, sosword randomly
+    id = 1
+
+    for w in (v.sosword, v.eosword)
+        push!(wembed_extension, rand(dist, tagrepsize*3)) # 3 because 3*32 = xpostag, upostag, featssum
+        id += 1
+    end
+    
+    for (s, is) in zip(corpus, sents) # iterate sentences
+        for i in 1:length(s.word) # iterate each word in a sentence
+            if id == is[i]
+                push!(wembed_extension, vcat(fs.postags[:,s.postag[i]], fs.xpostags[:,s.xpostag[i]], sumfeats(s.feats[i],fs)))
+                id += 1
+            end
+        end
+    end
+    
+    extended_wembed = vcat(wembed,hcat(wembed_extension...)) # concat version(446X13808) = wembed + wembed_extension(postag,xpostag,feat)
+    return extended_wembed
+end
+
+function mywordlstm(model, data, mask, embeddings)
+    weight, bias = wforw(model), bforw(model)
+    T = length(data)
+    B = length(data[1])
+    H = div(length(bias), 4)
+
+    if isa(weight, KnetArray)
+        mask = map(KnetArray, mask)
+    end
+    
+    wzero = fill!(similar(bias, H, B), 0)
+
+    # forward lstm
+    hidden = cell = wzero
+    fhiddens = Array{Any}(undef,T-2)  # fhiddens = Array(Any, T-2) : deprecated
+    
+    dist = Normal()
+    difference = size(embeddings,1)+size(hidden,1)-size(weight,2)
+    extweight = hcat(weight, rand(dist, (size(weight,1), difference))) # extend pretrained model weights with randomly initalized weights for xpos, upos, feat
+    # number of the weigths are decided by subtracting (column)number of pretrained model weights from (row) number of extended wembeddings (which is equal to 96 since 3 x 32 as of now)
+
+    
+    for t in 1:T-2
+        (hidden, cell) = _lstm(extweight, bias, hidden, cell, embeddings[:, data[t]]; mask=mask[t])
+        fhiddens[t] = hidden
+    end
+
+    # backward lstm
+    weight_b, bias_b = wback(model), bback(model)
+
+    hidden = cell = wzero
+    bhiddens = Array{Any}(undef,T-2)  # bhiddens = Array(Any, T-2) : deprecated
+
+    difference_b = size(embeddings,1)+size(hidden,1)-size(weight_b,2) # 746 - ()
+    extweight_b = hcat(weight_b, rand(dist, (size(weight_b,1), difference_b)))
+    
+    for t in T:-1:3
+        (hidden, cell) = _lstm(extweight_b, bias_b, hidden, cell, embeddings[:, data[t]]; mask=mask[t])
+        bhiddens[t-2] = hidden
+    end
+    return fhiddens, bhiddens
 end
