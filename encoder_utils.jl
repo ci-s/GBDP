@@ -284,6 +284,10 @@ function fillvecs!(wmodel, sentences, vocab; batchsize=128)
     wembed =hcat(wembed...) # Here I applied the changes from hcatn-> hcat in newer version
     fillwvecs!(sentences, sents, wembed)
 
+    #extended wembed contains xpos and feats tags concataneted to wembed
+    #extended_wembed = hcat(wembed,) 
+    
+    
     sos,eos,unk = vocab.idict[vocab.sosword], vocab.idict[vocab.eosword], vocab.odict[vocab.unkword]
     result = zeros(2)
     #free_KnetArray()
@@ -298,5 +302,5 @@ function fillvecs!(wmodel, sentences, vocab; batchsize=128)
         odata, omask = goldbatch(sentij, maxij, vocab.odict, unk)
         lmloss(wmodel,odata,omask,forw,back; result=result) 
     end
-    #return exp(-result[1]/result[2])
+    #return wdata,wembed,wmask
 end
