@@ -299,7 +299,7 @@ function fillvecs!(wmodel, sentences, vocab, fs; batchsize=128)
         j = min(i+batchsize-1, length(sents))
         isentij = view(sents, i:j)
         maxij = maximum(map(length, isentij))
-        global wdata, wmask = tokenbatch(isentij, maxij, sos, eos)
+        wdata, wmask = tokenbatch(isentij, maxij, sos, eos)
         forw, back = mywordlstm(wmodel, wdata, wmask, extended_wembed)
         sentij = view(sentences, i:j)
         fillcvecs!(sentij, forw, back)
@@ -351,6 +351,14 @@ function createfeatvec!(corpus, fs)
     end
 end
 
+
+function fillcavec!(corpus)
+    for sent in corpus
+        for i in 1:length(sent)
+            push!(sent.cavec, vcat(sent.wvec[i], sent.fvec[i], sent.bvec[i]))
+        end
+    end
+end
 
 function extend_wembeddings(v, fs, corpus, sents, wembed) # v: Vocab, fs: feature source, sents: maptoint output-int represented sentences,  
     wembed_extension = []

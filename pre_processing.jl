@@ -108,7 +108,7 @@ end
 
 function minibatch(corpus, batchsize; maxlen=typemax(Int), minlen=1, shuf=false)
     data = Any[]
-    #sorted = sort(corpus, by=length)
+    sorted = sort(corpus, by=length)
     i1 = findfirst(x->(length(x) >= minlen), sorted)
     if i1==0; error("No sentences >= $minlen"); end
     i2 = findlast(x->(length(x) <= maxlen), sorted)
