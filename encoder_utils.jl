@@ -289,7 +289,7 @@ function fillvecs!(wmodel, sentences, vocab, fs; batchsize=128)
     fillwvecs!(sentences, sents, wembed)
 
     # extended word embeddings with xpos, upos and feats
-    extended_wembed = extend_wembeddings(v, fs, corpus, sents, wembed)
+    extended_wembed = extend_wembeddings(v, fs, sentences, sents, wembed)
     
     
     sos,eos,unk = vocab.idict[vocab.sosword], vocab.idict[vocab.eosword], vocab.odict[vocab.unkword]
@@ -355,32 +355,33 @@ end
 function fillcavec!(corpus)
     for sent in corpus
         for i in 1:length(sent)
-            push!(sent.cavec, vcat(sent.wvec[i], sent.fvec[i], sent.bvec[i]))
+            push!(sent.cavec, KnetArray(map(Float32,vcat(sent.wvec[i], sent.fvec[i], sent.bvec[i]))))
         end
     end
 end
 
-function extend_wembeddings(v, fs, corpus, sents, wembed) # v: Vocab, fs: feature source, sents: maptoint output-int represented sentences,  
-    wembed_extension = []
+function extend_wembeddings(v, fs, corpus, sents, wembed) # v: Vocab, fs: feature source, sents: maptoint output-int represented sentences, 
+    wembed_extension = Any[]
     dist = Normal() # to initialize eosword, sosword randomly
     id = 1
 
     for w in (v.sosword, v.eosword)
-        push!(wembed_extension, rand(dist, tagrepsize*3)) # 3 because 3*32 = xpostag, upostag, featssum
+        kw = map(Float32,rand(dist, tagrepsize*3))
+        push!(wembed_extension, KnetArray(kw)) # 3 because 3*32 = xpostag, upostag, featssum
         id += 1
     end
     
     for (s, is) in zip(corpus, sents) # iterate sentences
         for i in 1:length(s.word) # iterate each word in a sentence
             if id == is[i]
-                push!(wembed_extension, vcat(fs.postags[:,s.postag[i]], fs.xpostags[:,s.xpostag[i]], sumfeats(s.feats[i],fs)))
+                push!(wembed_extension, KnetArray(map(Float32,vcat(fs.postags[:,s.postag[i]], fs.xpostags[:,s.xpostag[i]], sumfeats(s.feats[i],fs)))))
                 id += 1
             end
         end
     end
     
-    extended_wembed = vcat(wembed,hcat(wembed_extension...)) # concat version(446X13808) = wembed + wembed_extension(postag,xpostag,feat)
-    return extended_wembed
+        extended_wembed = vcat(wembed,hcat(wembed_extension...)) # concat version(446X13808) = wembed + wembed_extension(postag,xpostag,feat)
+    return vcat(extended_wembed...)
 end
 
 function mywordlstm(model, data, mask, embeddings)
@@ -401,7 +402,7 @@ function mywordlstm(model, data, mask, embeddings)
     
     dist = Normal()
     difference = size(embeddings,1)+size(hidden,1)-size(weight,2)
-    extweight = hcat(weight, rand(dist, (size(weight,1), difference))) # extend pretrained model weights with randomly initalized weights for xpos, upos, feat
+    extweight = hcat(weight, KnetArray(map(Float32,rand(dist, (size(weight,1), difference))))) # extend pretrained model weights with randomly initalized weights for xpos, upos, feat
     # number of the weigths are decided by subtracting (column)number of pretrained model weights from (row) number of extended wembeddings (which is equal to 96 since 3 x 32 as of now)
 
     
@@ -417,7 +418,7 @@ function mywordlstm(model, data, mask, embeddings)
     bhiddens = Array{Any}(undef,T-2)  # bhiddens = Array(Any, T-2) : deprecated
 
     difference_b = size(embeddings,1)+size(hidden,1)-size(weight_b,2) # 746 - ()
-    extweight_b = hcat(weight_b, rand(dist, (size(weight_b,1), difference_b)))
+    extweight_b = hcat(weight_b, KnetArray(map(Float32,rand(dist, (size(weight_b,1), difference_b)))))
     
     for t in T:-1:3
         (hidden, cell) = _lstm(extweight_b, bias_b, hidden, cell, embeddings[:, data[t]]; mask=mask[t])
