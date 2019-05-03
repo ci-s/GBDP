@@ -226,4 +226,10 @@ mutable struct FeatureSource
     postags::Array{Float64}
     xpostags::Array{Float64}
     feats::Array{Float64}
+    deprels::Array{Float64}
+end
+
+mutable struct Parser
+    head::Vector{Int16}      # 7. HEAD: Head of the current word, which is either a vvalue of ID or zero 
+    deprel::Vector{UInt8} 
 end

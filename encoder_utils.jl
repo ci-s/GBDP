@@ -330,7 +330,8 @@ function createcolvecs(corpus,ev)
     xpostags = rand(dist, (tagrepsize, length(keys(ev.xpostags))))
     postags = rand(dist, (tagrepsize, length(keys(ev.vocab.postags))))
     feats = rand(dist, (tagrepsize, length(keys(ev.feats))))
-    return FeatureSource(postags,xpostags,feats)
+    deprels = rand(dist, (tagrepsize*100, length(keys(ev.vocab.deprels))))
+    return FeatureSource(postags,xpostags,feats,deprels)
 end
 
 # fs: feature source, feats: features of a word, s.feats[i]
