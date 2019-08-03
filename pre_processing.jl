@@ -126,3 +126,10 @@ end
 
 # Things we added
 
+function model_charfix(d)
+    d["new_d2"]["unkchar"] = Char(0x11)
+    d["new_d2"]["sowchar"] = Char(0x12)
+    d["new_d2"]["eowchar"] = Char(0x13)
+    return d["new_d2"]
+end
+

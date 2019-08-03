@@ -1,5 +1,6 @@
 # using Distributions, Random ??
 
+atype=(gpu()>=0 ? KnetArray{Float32} : Array{Float32})
 global tagrepsize = 32 # Size of the randomly initialized column vectors that represents features such that xpostag, upostag, feats
 
 function fillwvecs!(sentences, isents, wembed; GPUFEATS=false)
@@ -312,6 +313,7 @@ end
 
 # Things we added
 
+# Delete this
 # Pad the feature vector (s.cavec) so that size of all feature vectors are 960
 function padfeatvec!(corpus) # used in demo, no longer used
     for s in corpus
@@ -356,10 +358,11 @@ end
 function fillcavec!(corpus)
     for sent in corpus
         for i in 1:length(sent)
-            push!(sent.cavec, KnetArray(map(Float32,vcat(sent.wvec[i], sent.fvec[i], sent.bvec[i]))))
+            push!(sent.cavec, atype(vcat(sent.wvec[i], sent.fvec[i], sent.bvec[i])))
         end
     end
 end
+
 
 function extend_wembeddings(v, fs, corpus, sents, wembed) # v: Vocab, fs: feature source, sents: maptoint output-int represented sentences, 
     wembed_extension = Any[]
@@ -367,15 +370,15 @@ function extend_wembeddings(v, fs, corpus, sents, wembed) # v: Vocab, fs: featur
     id = 1
 
     for w in (v.sosword, v.eosword)
-        kw = map(Float32,rand(dist, tagrepsize*3))
-        push!(wembed_extension, KnetArray(kw)) # 3 because 3*32 = xpostag, upostag, featssum
+        kw = atype(rand(dist, tagrepsize*3))
+        push!(wembed_extension, kw) # 3 because 3*32 = xpostag, upostag, featssum
         id += 1
     end
     
     for (s, is) in zip(corpus, sents) # iterate sentences
         for i in 1:length(s.word) # iterate each word in a sentence
             if id == is[i]
-                push!(wembed_extension, KnetArray(map(Float32,vcat(fs.postags[:,s.postag[i]], fs.xpostags[:,s.xpostag[i]], sumfeats(s.feats[i],fs)))))
+                push!(wembed_extension, atype(vcat(fs.postags[:,s.postag[i]], fs.xpostags[:,s.xpostag[i]], sumfeats(s.feats[i],fs))) )
                 id += 1
             end
         end
@@ -403,7 +406,7 @@ function mywordlstm(model, data, mask, embeddings)
     
     dist = Normal()
     difference = size(embeddings,1)+size(hidden,1)-size(weight,2)
-    extweight = hcat(weight, KnetArray(map(Float32,rand(dist, (size(weight,1), difference))))) # extend pretrained model weights with randomly initalized weights for xpos, upos, feat
+    extweight = hcat(weight, atype(rand(dist, (size(weight,1), difference)))) # extend pretrained model weights with randomly initalized weights for xpos, upos, feat
     # number of the weigths are decided by subtracting (column)number of pretrained model weights from (row) number of extended wembeddings (which is equal to 96 since 3 x 32 as of now)
 
     
@@ -419,7 +422,7 @@ function mywordlstm(model, data, mask, embeddings)
     bhiddens = Array{Any}(undef,T-2)  # bhiddens = Array(Any, T-2) : deprecated
 
     difference_b = size(embeddings,1)+size(hidden,1)-size(weight_b,2) # 746 - ()
-    extweight_b = hcat(weight_b, KnetArray(map(Float32,rand(dist, (size(weight_b,1), difference_b)))))
+    extweight_b = hcat(weight_b, atype(rand(dist, (size(weight_b,1), difference_b))))
     
     for t in T:-1:3
         (hidden, cell) = _lstm(extweight_b, bias_b, hidden, cell, embeddings[:, data[t]]; mask=mask[t])
